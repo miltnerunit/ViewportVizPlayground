@@ -1,0 +1,8 @@
+# Roblox Studio place lock — created while a .rbxl is open, transient
+*.rbxl.lock
+
+# Rojo / build output (place is built to a temp path, not committed)
+/build/
+
+# macOS
+.DS_Store
