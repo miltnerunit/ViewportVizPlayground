@@ -1,10 +1,6 @@
 {
-  "className": "Sound",
+  "className": "AudioPlayer",
   "properties": {
-    "Tags": [
-      "Assistant:4fb8624b-cf01-4ee1-8327-debeaebbccc3"
-    ],
-    "SourceAssetId": 135483737426662.0,
-    "AudioContent": "rbxassetid://135483737426662"
+    "Asset": "rbxassetid://135483737426662"
   }
 }

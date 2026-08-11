@@ -3,7 +3,26 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local coinsFolder = workspace:WaitForChild("World"):WaitForChild("Coins")
 local audioFolder = ReplicatedStorage:WaitForChild("Audio")
-local soundTemplate = audioFolder:FindFirstChild("CoinCollect")
+local playerTemplate = audioFolder:WaitForChild("CoinCollect") -- AudioPlayer template
+
+-- Fallback rig builder: coins are normally authored with their AudioPlayer/AudioEmitter/
+-- Wire in the scene (visible + editable in the Explorer). This runtime builder only kicks
+-- in for a coin that somehow has no authored rig, so audio never silently breaks.
+local function buildCoinAudio(coin)
+	local audioPlayer = playerTemplate:Clone()
+	audioPlayer.Name = "CoinAudioPlayer"
+	audioPlayer.Parent = coin
+
+	local emitter = Instance.new("AudioEmitter")
+	emitter.Parent = coin
+
+	local wire = Instance.new("Wire")
+	wire.SourceInstance = audioPlayer -- AudioPlayer output ...
+	wire.TargetInstance = emitter -- ... into the spatial emitter
+	wire.Parent = coin
+
+	return audioPlayer
+end
 
 -- Debounce per coin to prevent rapid repeated triggers
 local debounce = {}
@@ -67,18 +86,12 @@ local function onCoinTouched(coin, otherPart)
 	combo.count += 1
 	schedulePitchReset(player)
 
-	-- Play the coin collect sound at the collecting player's pitch
-	local sound = coin:FindFirstChild("CoinSound")
-	if not sound and soundTemplate then
-		sound = soundTemplate:Clone()
-		sound.Name = "CoinSound"
-		sound.Parent = coin
-	end
-	if sound then
-		-- Each half-step up: multiply by 2^(1/12)
-		sound.PlaybackSpeed = 2 ^ (combo.count / 12)
-		sound:Play()
-	end
+	-- Play the coin collect sound at the collecting player's pitch, spatially from the
+	-- coin via its authored AudioPlayer -> Wire -> AudioEmitter rig (runtime-built fallback).
+	local audioPlayer = coin:FindFirstChild("CoinAudioPlayer") or buildCoinAudio(coin)
+	-- Each half-step up: multiply by 2^(1/12)
+	audioPlayer.PlaybackSpeed = 2 ^ (combo.count / 12)
+	audioPlayer:Play()
 
 	task.wait(1)
 	debounce[coin] = nil
@@ -88,6 +101,7 @@ local function setupCoin(coin)
 	-- Attach to any BasePart in the Coins folder, regardless of name, so
 	-- reskinning the pickups (coins -> hearts -> whatever) doesn't break audio.
 	if coin:IsA("BasePart") then
+		-- Rigs are authored in the scene, so nothing to build here; just listen.
 		coin.Touched:Connect(function(otherPart)
 			onCoinTouched(coin, otherPart)
 		end)

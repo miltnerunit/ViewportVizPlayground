@@ -31,14 +31,48 @@ To change the footstep/duck audio, just edit the folders — **no code change ne
 
 There are no hardcoded ID lists in the script anymore, so nothing to keep in sync.
 
-## CoinCollect
+## CoinCollect (new audio API)
 
-Played by [`CoinSoundScript.server.luau`](../src/ServerScriptService/CoinSoundScript.server.luau)
-— cloned onto each pickup on `Touched`, pitch rises a half-step per collect.
+The coin pickup uses Roblox's **modern audio graph**, not a legacy `Sound`.
+`CoinCollect.model.json` is now an **`AudioPlayer`** (`Asset = rbxassetid://135483737426662`).
 
-| Name | Asset ID |
-|------|----------|
-| CoinCollect | 135483737426662 |
+Each coin is **authored in the scene** with its own rig — `AudioPlayer` (named
+`CoinAudioPlayer`) → `Wire` → `AudioEmitter` — parented to the coin so it emits spatially from
+the coin's position. Because they're authored (not script-created), they're **visible and
+editable in the Explorer without pressing Play**. These live in `bonkers.rbxl` (scene data,
+LFS), not in `src/`.
+
+[`CoinSoundScript.server.luau`](../src/ServerScriptService/CoinSoundScript.server.luau) just
+finds each coin's `CoinAudioPlayer`, sets `PlaybackSpeed` (half-step per collect), and plays
+it. If a coin somehow lacks an authored rig, the script builds one at runtime as a fallback so
+audio never silently breaks.
+
+To author the rigs on the coins in the scene, run this once in the Studio **Command Bar**
+(Edit mode), then save the place:
+
+```lua
+local coins = workspace.World.Coins
+local template = game:GetService("ReplicatedStorage").Audio.CoinCollect -- AudioPlayer
+for _, coin in coins:GetChildren() do
+	if coin:IsA("BasePart") and not coin:FindFirstChild("CoinAudioPlayer") then
+		local p = template:Clone(); p.Name = "CoinAudioPlayer"; p.Parent = coin
+		local e = Instance.new("AudioEmitter"); e.Parent = coin
+		local w = Instance.new("Wire"); w.SourceInstance = p; w.TargetInstance = e; w.Parent = coin
+	end
+end
+```
+
+⚠️ The new API has **no implicit listener** — nothing is audible without one. That's set up by
+[`AudioListenerSetup.client.luau`](../src/StarterPlayer/StarterPlayerScripts/AudioListenerSetup.client.luau),
+which creates an `AudioListener` + `AudioDeviceOutput` on the camera. If coins go silent, check
+that script ran.
+
+(Footsteps/ducks in `GrassSteps/`/`DuckSounds/` remain on the legacy `Sound` API for now,
+which uses `SoundService`'s default listener — a separate path that coexists with the above.)
+
+| Name | Asset ID | Type |
+|------|----------|------|
+| CoinCollect | 135483737426662 | AudioPlayer |
 
 ## GrassSteps (volume 0.6)
 
