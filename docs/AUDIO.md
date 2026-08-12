@@ -70,6 +70,63 @@ that script ran.
 (Footsteps/ducks in `GrassSteps/`/`DuckSounds/` remain on the legacy `Sound` API for now,
 which uses `SoundService`'s default listener — a separate path that coexists with the above.)
 
+## Flowers (new audio API, looping ambient)
+
+The flowers use the same **modern audio graph** as the coins. Each flower is **authored in
+the scene** with its own rig — `AudioPlayer` (named `FlowerAudioPlayer`) → `Wire` →
+`AudioEmitter` — parented to the flower's part so it emits spatially from the flower.
+
+Unlike the coins (which `:Play()` on touch), the flowers are meant to be **continuous
+ambient loops**. The modern audio API has **no serializable "play on start" flag** (the
+legacy `Sound.Playing` has no `AudioPlayer` equivalent), so an authored, looping
+`AudioPlayer` sits idle until something starts it.
+[`FlowerAmbience.server.luau`](../src/ServerScriptService/FlowerAmbience.server.luau) does
+that: it finds every `FlowerAudioPlayer` in the scene, sets `Looping = true`, and calls
+`:Play()`. It skips players with a blank `Asset` so unfilled rigs don't warn.
+
+The rigs are authored with a **blank `Asset`** on purpose — pick each flower's sound in the
+Explorer/Properties (or set `Asset = rbxassetid://…`) and it will start looping on the next
+run. To author the rigs, **select the flowers in the Explorer**, run this once in the Studio
+**Command Bar** (Edit mode), then save the place:
+
+The flowers are **Models** (often with no `PrimaryPart` set), so the script searches
+**recursively** for a part to host the emitter and prints a per-flower report:
+
+```lua
+local Selection = game:GetService("Selection")
+local rigged, skipped = 0, 0
+for _, sel in Selection:Get() do
+	-- AudioEmitters need a BasePart for their position. Use the Model's PrimaryPart,
+	-- else the first BasePart anywhere inside it (recursive), else the part itself.
+	local part = (sel:IsA("BasePart") and sel)
+		or (sel:IsA("Model") and (sel.PrimaryPart or sel:FindFirstChildWhichIsA("BasePart", true)))
+	if not part then
+		warn(("[flower audio] %s has no BasePart -- skipped"):format(sel:GetFullName()))
+		skipped += 1
+	elseif part:FindFirstChild("FlowerAudioPlayer") then
+		print(("[flower audio] %s already rigged -- skipped"):format(sel:GetFullName()))
+		skipped += 1
+	else
+		local p = Instance.new("AudioPlayer")
+		p.Name = "FlowerAudioPlayer"
+		p.Looping = true
+		-- p.Asset = "rbxassetid://…"  -- leave blank; fill per-flower in Properties
+		p.Parent = part
+		local e = Instance.new("AudioEmitter"); e.Parent = part
+		local w = Instance.new("Wire"); w.SourceInstance = p; w.TargetInstance = e; w.Parent = part
+		print(("[flower audio] rigged %s (on %s)"):format(sel:GetFullName(), part.Name))
+		rigged += 1
+	end
+end
+print(("[flower audio] done -- %d rigged, %d skipped"):format(rigged, skipped))
+```
+
+The rig lands on the flower's part (one level down inside the Model), so in the Explorer
+expand a flower → expand its part to see `FlowerAudioPlayer` / `AudioEmitter` / `Wire`.
+
+⚠️ Same listener caveat as the coins: nothing is audible without the
+`AudioListener` + `AudioDeviceOutput` from `AudioListenerSetup.client.luau`.
+
 | Name | Asset ID | Type |
 |------|----------|------|
 | CoinCollect | 135483737426662 | AudioPlayer |
