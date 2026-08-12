@@ -10,6 +10,13 @@
 --
 -- Nothing is audible without an AudioListener/AudioDeviceOutput -- that's set up on the
 -- camera by AudioListenerSetup.client.luau (shared with the coins).
+--
+-- NOTE: playback is started with a plain :Play() here. The scheduled :Play(atTime)
+-- variant (for phase-locking the loops to a shared mixer step) CANNOT be used from a
+-- server script -- SoundService:GetMixerTime() / Play(atTime) are client-only, and calling
+-- them here errors ("AudioPlayer:Play(atTime) cannot be used on the server"). Starting all
+-- players in one yield-free frame keeps identical-length loops close enough in practice; for
+-- guaranteed sync the start would have to move to a client script (see docs/AUDIO.md).
 
 local Workspace = game:GetService("Workspace")
 
@@ -28,7 +35,8 @@ local function startFlower(player)
 	end
 end
 
--- Start any flowers already in the scene
+-- Start any flowers already in the scene. Running this loop without yields starts every
+-- player within one frame, so identical-length loops stay roughly aligned.
 for _, descendant in ipairs(Workspace:GetDescendants()) do
 	startFlower(descendant)
 end

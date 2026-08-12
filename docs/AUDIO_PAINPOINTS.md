@@ -127,8 +127,74 @@ experiences for the new API.
 
 ---
 
+## 5. No way to batch-set audio asset permissions
+
+**What happened.** To let collaborators use a set of uploaded audio files, permission has to
+be granted **one audio file at a time** on the Creator website. You *can* grant to a **group**
+rather than picking individual usernames — which helps the "who" axis — but you still have to
+**touch every file at least once**. There's no multi-select across assets, no "select all," no
+folder- or bulk-grant. Sharing a library of sounds means clicking into every single asset.
+
+**Who it hurts.** Anyone sharing audio with collaborators — sound designers and project leads
+most of all. Group grants fix the per-*person* fan-out, but toil still scales linearly with
+the number of **files**: a project with dozens of stems/SFX means dozens of per-asset visits.
+
+**The ask (features to campaign for).**
+- **Multi-select + bulk "grant permission"** across audio assets — the key gap, since group
+  grants already fix the per-person axis but not the per-file one.
+- Grant permissions **by folder / collection**, so a whole set is shared in one action.
+- Ideally a **team- or experience-level share** so audio uploaded for a place is usable by all
+  collaborators on that place without per-file grants.
+
+**Current workarounds.**
+- Grant access to each audio file individually on the Creator website. Tedious and error-prone
+  — easy to miss one, and there's no way to see at a glance which are shared.
+
+**Priority.** High. Pure manual toil that scales with both asset count and collaborator count,
+with no batch path at all.
+
+---
+
+# Other Studio pain points (non-audio)
+
+Secondary to the audio focus above, but worth logging since they came up in the same work.
+Numbered separately (N1, N2, …) so the audio list stays the headline.
+
+## N1. Recoloring imported meshes with baked textures is near-impossible
+
+**What happened.** Trying to recolor a set of imported flower Models to bright colors, the
+part `Color` had **no effect** — the color is baked into the mesh via texture/PBR data that
+survives every normal override. We tried, in order: setting `Color` (ignored), `Material =
+Neon` (color came out tinted — cool hues multiplied to black against a warm baked texture),
+removing the `SurfaceAppearance` (there wasn't one), and clearing `MeshPart.TextureID` (didn't
+help). The color is locked somewhere unreachable per-part (likely `SpecialMesh.VertexColor`, a
+`MaterialVariant`, or baked vertex colors). The only thing that reliably showed a chosen color
+was a **`Highlight` overlay** — and even that can't do an outline-only look, because `Highlight`
+won't render on a part at `Transparency = 1`, so you can't hide the mesh and keep just its form.
+
+**Who it hurts.** Anyone (designers especially) trying to restyle Creator-Store / imported
+mesh assets. "Change this asset's color" is a basic, expected operation that currently has no
+dependable path — you end up overlaying `Highlight`s instead of actually recoloring.
+
+**The ask (features to campaign for).**
+- A dependable **"tint / override color" on a MeshPart** that wins over baked texture/PBR data
+  (or a clear Properties indicator of *why* `Color` is being ignored and what's overriding it).
+- **Outline / silhouette rendering that works on hidden meshes**, so "keep the form, drop the
+  surface" is possible without leaving the mesh visible.
+- A one-click **"strip baked appearance"** to reset a mesh to a plain recolorable state.
+
+**Current workarounds.**
+- `Highlight` per Model with a solid opaque fill — paints over the mesh in a chosen color.
+  Works, but it's an overlay hack (not a real recolor), can't do outline-only, and is a per-
+  instance extra instance to manage.
+
+**Priority.** Medium (non-audio). Recurring friction whenever restyling imported assets;
+no reliable non-hack path today.
+
+---
+
 <!--
-Template for the next entry:
+Template for the next entry (prefix non-audio entries with N):
 
 ## N. <short title>
 

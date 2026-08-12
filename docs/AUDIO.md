@@ -127,9 +127,63 @@ expand a flower → expand its part to see `FlowerAudioPlayer` / `AudioEmitter` 
 ⚠️ Same listener caveat as the coins: nothing is audible without the
 `AudioListener` + `AudioDeviceOutput` from `AudioListenerSetup.client.luau`.
 
+## Birds (peeps + hop landings)
+
+The imported bird (`Workspace.Sketchfab_Scene`) is turned into a hopping flock by
+[`BirdNPCs.server.luau`](../src/ServerScriptService/BirdNPCs.server.luau). It clones the bird
+`NUM_BIRDS` times into `Workspace.Birds` and each bird makes two kinds of sound:
+
+**Peeps — modern spatial rig (visible in the Explorer).** Each bird gets an `AudioPlayer`
+(named `BirdPeepPlayer`) → `Wire` → `AudioEmitter` on its `PrimaryPart`, so chirps emit from
+the bird's position — the same authored, inspectable pattern as the coins/flowers. The template
+is `ReplicatedStorage.Audio.BirdPeep` (an `AudioPlayer` with a **blank `Asset`**, like the
+flowers — pick a chirp and it starts peeping). The script plays it on a random per-bird timer
+with a little pitch variation, and **skips it while the `Asset` is blank** so nothing warns.
+
+Author the rig on the bird **in edit mode** so it's visible/editable in the Explorer (clones
+inherit it at runtime; `BirdNPCs` also builds it as a runtime fallback for any unrigged bird).
+Select the bird in the Explorer, run this once in the **Command Bar**, then save the place:
+
+```lua
+local template = game:GetService("ReplicatedStorage").Audio.BirdPeep -- AudioPlayer (blank Asset)
+for _, sel in game:GetService("Selection"):Get() do
+	local part = (sel:IsA("BasePart") and sel)
+		or (sel:IsA("Model") and (sel.PrimaryPart or sel:FindFirstChildWhichIsA("BasePart", true)))
+	if part and not part:FindFirstChild("BirdPeepPlayer") then
+		local p = template:Clone(); p.Name = "BirdPeepPlayer"; p.Parent = part
+		local e = Instance.new("AudioEmitter"); e.Parent = part
+		local w = Instance.new("Wire"); w.SourceInstance = p; w.TargetInstance = e; w.Parent = part
+	end
+end
+```
+
+Then set the chirp: fill `Asset` on either `ReplicatedStorage.Audio.BirdPeep` (propagates to all
+birds) or the per-bird `BirdPeepPlayer` in Properties.
+
+**Hop landings — dedicated Sound folder (data-driven).** `ReplicatedStorage.Audio.BirdLands/`
+holds the landing sounds (legacy `Sound` instances, same folder pattern as `GrassSteps`).
+`BirdNPCs` clones them onto each bird's part and plays a random one **as each hop touches down**,
+pitched up a touch and at reduced volume for a light footfall. Add/remove variations by
+dropping/removing files — no code change. The folder ships with a **blank-`SoundId` placeholder**
+(`BirdLand 1`) that the script skips; fill its `SoundId` (or add more `Sound` files) to make
+landings audible.
+
+⚠️ The peep rig has the same listener requirement as the coins/flowers (needs the camera
+`AudioListener`). The landing `Sound`s use the legacy default listener, like the footsteps.
+
 | Name | Asset ID | Type |
 |------|----------|------|
 | CoinCollect | 102691033782199 | AudioPlayer |
+| BirdPeep | _(blank — pick a chirp)_ | AudioPlayer |
+
+## BirdLands (dedicated hop-landing sounds, volume 0.4)
+
+Played light (pitched up ~1.05–1.3×, volume scaled ×0.7) as each bird hop lands. Blank-`SoundId`
+entries are skipped, so the placeholder below stays silent until you fill it.
+
+| Name | Asset ID |
+|------|----------|
+| BirdLand 1 | _(blank — fill in)_ |
 
 ## GrassSteps (volume 0.6)
 
