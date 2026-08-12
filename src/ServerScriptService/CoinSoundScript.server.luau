@@ -59,6 +59,22 @@ local function schedulePitchReset(player)
 	end)
 end
 
+-- Major pentatonic scale: semitone offsets of each scale degree within one octave
+-- (root, whole, whole, +minor-third, whole). Collecting climbs one degree at a time and
+-- wraps up an octave every 5 steps, so a combo ascends a pentatonic run instead of a
+-- chromatic one -- more musical, no "wrong" notes.
+local PENTATONIC = { 0, 2, 4, 7, 9 }
+
+-- PlaybackSpeed for a 0-based ascending step: step 0 = root (1.0x), climbing the pentatonic
+-- scale and rising an octave each time it wraps past the top degree. Uncapped -- the combo
+-- keeps climbing for as long as the player chains collects (idle reset still returns to root).
+local function pentatonicPlaybackSpeed(step)
+	local octave = math.floor(step / #PENTATONIC)
+	local degree = step % #PENTATONIC
+	local semitones = octave * 12 + PENTATONIC[degree + 1]
+	return 2 ^ (semitones / 12)
+end
+
 local function onCoinTouched(coin, otherPart)
 	if debounce[coin] then
 		return
@@ -89,8 +105,8 @@ local function onCoinTouched(coin, otherPart)
 	-- Play the coin collect sound at the collecting player's pitch, spatially from the
 	-- coin via its authored AudioPlayer -> Wire -> AudioEmitter rig (runtime-built fallback).
 	local audioPlayer = coin:FindFirstChild("CoinAudioPlayer") or buildCoinAudio(coin)
-	-- Each half-step up: multiply by 2^(1/12)
-	audioPlayer.PlaybackSpeed = 2 ^ (combo.count / 12)
+	-- combo.count is 1-based (bumped above), so count 1 -> step 0 = root note.
+	audioPlayer.PlaybackSpeed = pentatonicPlaybackSpeed(combo.count - 1)
 	audioPlayer:Play()
 
 	task.wait(1)

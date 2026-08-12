@@ -41,6 +41,92 @@ emitter count and there is no non-scripter path to reuse.
 
 ---
 
+## 2. No "play on start" for `AudioPlayer` (ambient loops need a script)
+
+**What happened.** The legacy `Sound` had a serializable `Playing` property — tick it in the
+Properties panel and the sound plays on load, no code. The modern `AudioPlayer` has **no
+equivalent**. `Looping` controls whether it repeats, but nothing starts it: an authored,
+looping `AudioPlayer` sits silent until something calls `:Play()` at runtime. So a simple
+"this flower hums forever" ambient loop is impossible to author without a script.
+
+**Who it hurts.** Sound designers, directly. The single most common ambient use case —
+"place a looping sound in the world and have it play" — now *requires* a scripter. There's no
+checkbox, no auto-play flag, nothing in the Properties panel that makes an authored player
+start.
+
+**The ask (features to campaign for).**
+- A serializable **auto-play / play-on-start** flag on `AudioPlayer` (the `Sound.Playing`
+  equivalent), so an authored looping player plays without code.
+- Ideally it just works in-editor preview too, so designers can hear the loop while placing.
+
+**Current workarounds.**
+- **A runtime script** that scans for the players and calls `:Play()` — exactly what
+  `FlowerAmbience.server.luau` does in this place. Works, but it's boilerplate every project
+  re-invents, and it's off-limits for a non-scripter.
+
+**Priority.** High. This is the default ambient-audio workflow and it currently has no
+no-code path.
+
+---
+
+## 3. Attenuation Curve Editor has no unit labels or field guidance
+
+**What happened.** The `DistanceAttenuation` property gives **no indication of what it is or
+what units it uses**. The inline Properties field looks like it might take a scalar or a
+comma-separated pair (like the legacy `RollOffMinDistance`/`MaxDistance`), but it's actually a
+**curve**. Nothing labels the axes: X is **distance in studs**, Y is **gain (0–1)**. You only
+discover this by opening the curve editor and inferring it. First instinct — "type min,max" —
+is simply wrong, with no hint saying so.
+
+**Who it hurts.** Anyone setting falloff, especially designers migrating from the legacy
+`Sound` mental model of min/max rolloff distances. The concept changed (scalars → curve) with
+no in-UI signposting.
+
+**The ask (features to campaign for).**
+- **Axis labels + units** in the Attenuation Curve Editor ("Distance (studs)" / "Gain (0–1)").
+- A **tooltip / hint** on the `DistanceAttenuation` field explaining it's a curve, not scalars.
+- Consider a **min/max convenience mode** that authors a simple curve for people who just want
+  the old rolloff behavior.
+
+**Current workarounds.**
+- Trial and error in the curve editor, or ask someone who already learned the model.
+- Command Bar `SetDistanceAttenuation({ [min] = 1, [max] = 0 })` if you know the API — again,
+  scripter-only.
+
+**Priority.** Medium. Not blocking, but a recurring "what do I even type here?" stumble that a
+label would eliminate.
+
+---
+
+## 4. New audio API has no implicit listener — silent with no warning
+
+**What happened.** The modern audio graph (`AudioPlayer` → `Wire` → `AudioEmitter`) produces
+**no sound at all** unless an `AudioListener` + `AudioDeviceOutput` exist and are wired to the
+player's output. The legacy `Sound`/`SoundService` path had an implicit default listener, so
+things "just worked." With the new API, a fully correct emitter rig is **silent by default**,
+and **nothing in Studio warns you** that a listener is missing — you just hear nothing and
+have no idea why.
+
+**Who it hurts.** Everyone adopting the new API, but especially designers who correctly built
+the emitter side and reasonably assume it should be audible. The failure is silent and gives
+no diagnostic pointing at the missing listener.
+
+**The ask (features to campaign for).**
+- An **in-editor warning / analyzer check**: "AudioEmitter present but no AudioListener is
+  wired to an output — audio will be inaudible."
+- Consider a **sensible default listener** (e.g. camera-attached) when none is authored, or a
+  one-click "add listener" affordance.
+
+**Current workarounds.**
+- Author an `AudioListener` + `AudioDeviceOutput` on the camera via a client script — this
+  place does it in `AudioListenerSetup.client.luau`. Boilerplate, and easy to forget, at which
+  point all new-API audio is mysteriously silent.
+
+**Priority.** High. A silent failure with no diagnostic is among the worst onboarding
+experiences for the new API.
+
+---
+
 <!--
 Template for the next entry:
 

@@ -34,7 +34,7 @@ There are no hardcoded ID lists in the script anymore, so nothing to keep in syn
 ## CoinCollect (new audio API)
 
 The coin pickup uses Roblox's **modern audio graph**, not a legacy `Sound`.
-`CoinCollect.model.json` is now an **`AudioPlayer`** (`Asset = rbxassetid://135483737426662`).
+`CoinCollect.model.json` is now an **`AudioPlayer`** (`Asset = rbxassetid://102691033782199`).
 
 Each coin is **authored in the scene** with its own rig — `AudioPlayer` (named
 `CoinAudioPlayer`) → `Wire` → `AudioEmitter` — parented to the coin so it emits spatially from
@@ -43,8 +43,8 @@ editable in the Explorer without pressing Play**. These live in `bonkers.rbxl` (
 LFS), not in `src/`.
 
 [`CoinSoundScript.server.luau`](../src/ServerScriptService/CoinSoundScript.server.luau) just
-finds each coin's `CoinAudioPlayer`, sets `PlaybackSpeed` (half-step per collect), and plays
-it. If a coin somehow lacks an authored rig, the script builds one at runtime as a fallback so
+finds each coin's `CoinAudioPlayer`, sets `PlaybackSpeed` (one **major-pentatonic** scale
+degree per collect in a combo — see `PENTATONIC` in the script), and plays it. If a coin somehow lacks an authored rig, the script builds one at runtime as a fallback so
 audio never silently breaks.
 
 To author the rigs on the coins in the scene, run this once in the Studio **Command Bar**
@@ -129,7 +129,7 @@ expand a flower → expand its part to see `FlowerAudioPlayer` / `AudioEmitter` 
 
 | Name | Asset ID | Type |
 |------|----------|------|
-| CoinCollect | 135483737426662 | AudioPlayer |
+| CoinCollect | 102691033782199 | AudioPlayer |
 
 ## GrassSteps (volume 0.6)
 
