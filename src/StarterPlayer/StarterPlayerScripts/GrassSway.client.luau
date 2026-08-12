@@ -13,6 +13,18 @@ local SWAY_AMOUNT = 0.12 -- max sway angle in radians (~7 degrees)
 local SWAY_SPEED = 1.5 -- how fast the breeze oscillates
 local UPDATE_INTERVAL = 0.05 -- seconds between updates (smooth but performant)
 
+-- Wind character. Single rigid parts can't truly curve, so these shape the *motion* to read
+-- as wind blowing across a field rather than a symmetric back-and-forth wobble.
+local WIND_DIR = Vector3.new(1, 0, 0.35) -- prevailing wind direction in the XZ plane
+local LEAN_BIAS = 0.5 -- resting downwind lean; blades flutter around a leaned pose, not upright
+local FLUTTER = 0.35 -- secondary cross-wind wobble, as a fraction of the main sway
+local GUST_SPEED = 0.35 -- how fast gusts roll in and out across the field
+local GUST_MIN = 0.55 -- sway strength during a lull (1.0 = no gusting, always full strength)
+
+-- Normalize the wind onto the horizontal plane (fallback to +X if WIND_DIR has no XZ length).
+local WIND = Vector3.new(WIND_DIR.X, 0, WIND_DIR.Z)
+WIND = WIND.Magnitude > 0 and WIND.Unit or Vector3.new(1, 0, 0)
+
 -- Cache original CFrames and precompute per-blade phase offsets.
 -- We walk descendants (not just direct children) so the grass container works as a Folder
 -- OR a Model, at any nesting depth -- e.g. "Group As Model" won't break the sway.
@@ -25,8 +37,8 @@ for _, blade in ipairs(grassFolder:GetDescendants()) do
 			part = blade,
 			baseCFrame = blade.CFrame,
 			phase = math.random() * math.pi * 2, -- random phase per blade
-			freqVar = 0.7 + math.random() * 0.6, -- slight frequency variation
-			ampVar = 0.7 + math.random() * 0.6, -- slight amplitude variation
+			freqVar = 0.7 + math.random() * 3.6, -- slight frequency variation
+			ampVar = 0.7 + math.random() * 1.5, -- slight amplitude variation
 		}
 		table.insert(allBlades, data)
 		bladeData[blade] = data
@@ -63,7 +75,7 @@ end
 -- Animate grass on a timer for performance
 local lastUpdate = 0
 
-RunService.Heartbeat:Connect(function(dt)
+RunService.Heartbeat:Connect(function()
 	local now = os.clock()
 	if now - lastUpdate < UPDATE_INTERVAL then
 		return
@@ -73,6 +85,10 @@ RunService.Heartbeat:Connect(function(dt)
 	local playerPos = getPlayerPosition()
 	local time = now * SWAY_SPEED
 
+	-- Gust envelope: a slow global surge and lull so the whole field breathes with the wind,
+	-- instead of every blade oscillating at a constant strength. Ranges GUST_MIN..1.
+	local gust = GUST_MIN + (1 - GUST_MIN) * (0.5 + 0.5 * math.sin(now * GUST_SPEED))
+
 	for _, data in ipairs(allBlades) do
 		local blade = data.part
 		-- Skip if blade was destroyed
@@ -81,9 +97,22 @@ RunService.Heartbeat:Connect(function(dt)
 			local distSq = (bladePos - playerPos).Magnitude
 
 			if distSq <= UPDATE_RADIUS then
-				-- Compute sway using sine wave with per-blade variation
-				local swayAngle = math.sin(time * data.freqVar + data.phase) * SWAY_AMOUNT * data.ampVar
-				local swayAngle2 = math.cos(time * data.freqVar * 0.8 + data.phase) * SWAY_AMOUNT * data.ampVar
+				-- Per-blade oscillation (their tuned freq/amp), shaped with a light second
+				-- harmonic so it flutters rather than swinging like a rigid pendulum.
+				local drive = time * data.freqVar + data.phase
+				local osc = math.sin(drive) + 0.25 * math.sin(2 * drive)
+
+				-- Lean predominantly downwind: a resting lean (LEAN_BIAS) plus the oscillation,
+				-- scaled by the blade's amplitude and the global gust -- reads as wind pushing
+				-- the grass, not a symmetric metronome wobble.
+				local amp = SWAY_AMOUNT * data.ampVar * gust
+				local lean = amp * (LEAN_BIAS + osc)
+				-- A smaller flutter perpendicular to the wind adds liveliness.
+				local side = amp * FLUTTER * math.cos(time * data.freqVar * 0.8 + data.phase)
+
+				-- Convert lean (toward WIND) + side (perpendicular to WIND) into X/Z tilt angles.
+				local swayAngle = lean * WIND.Z + side * WIND.X
+				local swayAngle2 = -lean * WIND.X + side * WIND.Z
 
 				-- Apply rotation around the base of the blade (pivot at bottom)
 				local basePos = data.baseCFrame.Position - Vector3.new(0, blade.Size.Y / 2, 0)
